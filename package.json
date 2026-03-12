@@ -10,6 +10,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "open": "^11.0.0"
+    "dotenv": "^17.3.1",
+    "open": "^11.0.0",
+    "openai": "^6.27.0"
   }
 }

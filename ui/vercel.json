@@ -1,0 +1,4 @@
+{
+  "buildCommand": "cp ../tone-of-voice-guidelines.md . && next build",
+  "outputDirectory": ".next"
+}
