@@ -52,10 +52,10 @@ export default function Home() {
             <button
               key={s}
               onClick={() => setStars(s)}
-              style={{ ...styles.starBtn, ...(stars === s ? styles.starActive : {}) }}
+              style={{ ...styles.starBtn, ...(s <= stars ? styles.starActive : {}) }}
               title={`${s} star${s > 1 ? 's' : ''}`}
             >
-              {s === stars ? '★' : '☆'}
+              {s <= stars ? '★' : '☆'}
             </button>
           ))}
           <span style={styles.starLabel}>{stars} star{stars > 1 ? 's' : ''}</span>
