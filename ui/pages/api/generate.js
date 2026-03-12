@@ -8,15 +8,9 @@ import path from 'path';
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Load guidelines from repo root (one level up from /ui)
-const guidelinesPath = path.join(process.cwd(), '..', 'tone-of-voice-guidelines.md');
-let guidelines;
-try {
-  guidelines = fs.readFileSync(guidelinesPath, 'utf8');
-} catch {
-  // Fallback: look in same directory (for Vercel deployment where files are copied)
-  guidelines = fs.readFileSync(path.join(process.cwd(), 'tone-of-voice-guidelines.md'), 'utf8');
-}
+// Guidelines file is co-located in the ui/ directory
+const guidelinesPath = path.join(process.cwd(), 'tone-of-voice-guidelines.md');
+const guidelines = fs.readFileSync(guidelinesPath, 'utf8');
 
 const SYSTEM_PROMPT = `${guidelines}
 
