@@ -1,6 +1,7 @@
 const fs = require('fs');
 
-const SERPAPI_KEY = '683cd137959643e2d15cfbb21d12ec2afadfaf63267c8e20c4c6d27996f24dc9';
+const SERPAPI_KEY = process.env.SERPAPI_KEY;
+if (!SERPAPI_KEY) { console.error('Missing SERPAPI_KEY env var. Add it to .env or export it.'); process.exit(1); }
 const REVIEWS_FILE = 'reviews_serpapi.json';
 
 // Step 1: Search for the place to get its data_id (SerpApi's place identifier)
