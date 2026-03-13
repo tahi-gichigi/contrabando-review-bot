@@ -32,16 +32,14 @@ async function generateReply(starRating, reviewText, language = 'PT') {
 Review text: ${reviewText || '(no comment)'}
 Reviewer language: ${language}`;
 
-  const response = await client.chat.completions.create({
+  const response = await client.responses.create({
     model: 'gpt-5-mini',
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userMessage }
-    ],
-    max_completion_tokens: 2000
+    instructions: SYSTEM_PROMPT,
+    input: userMessage,
+    reasoning: { effort: 'minimal' }
   });
 
-  return response.choices[0].message.content.trim();
+  return response.output_text.trim();
 }
 
 module.exports = { generateReply };

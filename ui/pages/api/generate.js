@@ -29,16 +29,14 @@ export default async function handler(req, res) {
 Review text: ${reviewText || '(no comment)'}
 Reviewer language: ${language || 'PT'}`;
 
-    const response = await client.chat.completions.create({
+    const response = await client.responses.create({
       model: 'gpt-5-mini',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userMessage }
-      ],
-      max_completion_tokens: 2000
+      instructions: SYSTEM_PROMPT,
+      input: userMessage,
+      reasoning: { effort: 'minimal' }
     });
 
-    const reply = response.choices[0].message.content.trim();
+    const reply = response.output_text.trim();
     res.status(200).json({ reply });
   } catch (err) {
     console.error(err);
