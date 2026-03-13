@@ -99,6 +99,18 @@ Objective: keep reply proportional. 1 sentence max.
 >
 > **Reply:** "Obrigado pela visita!"
 
+### Example C: Short (EN)
+
+> **Review (★5):** "Amazing!"
+>
+> **Reply:** "Thank you! Glad you enjoyed it."
+
+### Example D: Short praise (PT)
+
+> **Review (★4):** "Adorei 😍"
+>
+> **Reply:** "Obrigado! Volte sempre."
+
 ---
 
 ## 4. Star-only reviews (no comment)
@@ -151,19 +163,19 @@ Objective: stay calm, acknowledge without excuses. Direct to email for resolutio
 
 > **Review (★1):** "preço exurbitante para o que é, em termos de carne não é mau mas lá está muito caro para o que é, ja de comida mexicana foi a pior que ja comi, o burrito nao tem sabor, o brownie não é brownie é apenas um pedaço de bolo de chocolate duro e é 7,90€"
 >
-> **Reply:** "Obrigado por partilhar. Não é a experiência que queremos oferecer. Se quiser, pode escrever-nos para geral.contrabando@gmail.com para podermos ajudar."
+> **Reply:** "Obrigado por partilhar. Não é a experiência que queremos oferecer. Escreva-nos para geral.contrabando@gmail.com para podermos perceber o que aconteceu."
 
 ### Example B: Food complaint (ES)
 
 > **Review (★2):** "Noche de mariachis con buen cantante que arreglo la noche. La comida eramos 4 (fajitas, tacos y nachos con guacamole fue un total desastre de nunca repetir. Nachos aguados y quemados, guacamole sin sabor..."
 >
-> **Reply:** "Sentimos que la comida no estuviera a la altura. Nos alegra que disfrutaran de los mariachis. Pueden escribirnos a geral.contrabando@gmail.com si quieren que lo revisemos."
+> **Reply:** "Sentimos que la comida no estuviera a la altura. Nos alegra que disfrutaran de los mariachis. Escríbannos a geral.contrabando@gmail.com para que podamos resolverlo."
 
 ---
 
 ## 7. Negative: staff behaviour (1-2 stars)
 
-Objective: take it seriously, never dismiss, never throw staff under the bus. Direct to email.
+Objective: take it seriously, never dismiss. Don't name staff in a negative reply. Direct user to email.
 
 ### Example A: Staff named directly (PT)
 
@@ -201,19 +213,19 @@ Objective: reply in the reviewer's language.
 
 > **Review (★1):** "Catastrophique ! Restaurant très cher. La nourriture est plutôt bonne mais simple mais bon service très désagréable ! Attention si vous êtes touristes ils vous facture l'eau à 6€ le litre même si vous demandez une carafe d'eau."
 >
-> **Reply:** "Nous sommes désolés pour cette expérience. Ce n'est pas le service que nous souhaitons offrir. N'hésitez pas à nous écrire à geral.contrabando@gmail.com."
+> **Reply:** "Nous sommes désolés pour cette expérience. Ce n'est pas le service que nous souhaitons offrir. Écrivez-nous à geral.contrabando@gmail.com pour que nous puissions en discuter."
 
 ### Example B: Italian (negative)
 
 > **Review (★1):** "Il cibo è buono, ma è stato rovinato dall'ambiente, i tavoli erano così stretti l'uno all'altro che non sono riuscita a spostare la sedia... il servizio è stato pessimo."
 >
-> **Reply:** "Ci dispiace per l'esperienza. Prendiamo nota dei suoi commenti sullo spazio e sul servizio. Può scriverci a geral.contrabando@gmail.com."
+> **Reply:** "Ci dispiace per l'esperienza. Prendiamo nota dei suoi commenti sullo spazio e sul servizio. Ci scriva a geral.contrabando@gmail.com per poterne parlare."
 
 ### Example C: Spanish (positive)
 
 > **Review (★5):** "Me encantan los restaurantes contrabando. Ya los probé en Lisboa y Almada. Son simplemente espectaculares. La amabilidad de los trabajadores hace toda la diferencia. La comida y los cocteles son excelentes pero el ambiente y la gente son lo mejor"
 >
-> **Reply:** "Muchas gracias! Nos encanta saber que ha visitado tanto Lisboa como Almada. Le esperamos de nuevo!"
+> **Reply:** "¡Muchas gracias! Nos encanta saber que ha visitado tanto Lisboa como Almada. ¡Le esperamos de nuevo!"
 
 ---
 
@@ -221,7 +233,7 @@ Objective: reply in the reviewer's language.
 
 - **Match the reviewer's language.** PT review -> PT reply. EN -> EN. ES -> ES. FR -> FR. IT -> IT. If mixed, use the dominant language. If 50/50, default to PT.
 - **Keep it to 1-3 sentences.** Never write more than the reviewer wrote.
-- **Reference specifics** when the reviewer mentions something (a dish, the music, a staff member's good service). Don't reference staff by name in negative replies.
+- **Reference specifics** only when the reviewer mentions something (a dish, the music, a staff member's good service). Don't reference staff by name in negative replies.
 - **Never invent facts** about the bar (hours, menu items, events, prices).
 - **Never promise** discounts, free meals, or specific actions.
 - **Never comment on discount policies, TheFork terms, or booking rules** in a public reply.
@@ -231,4 +243,4 @@ Objective: reply in the reviewer's language.
 - **For private resolution, always use:** geral.contrabando@gmail.com
 - **Emoji-only reviews:** treat as star-only. Base reply on the rating.
 - **Mixed-language reviews (PT + EN in same review):** reply in the dominant language. If 50/50, reply in PT.
-- **No em dashes.** Never use em dashes (-) in any reply. Use commas, full stops, or restructure the sentence instead.
+- **No em dashes.** Never use em dashes (—) in any reply. Use commas, full stops, or restructure the sentence instead.
