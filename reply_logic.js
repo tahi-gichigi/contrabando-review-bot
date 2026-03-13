@@ -33,11 +33,12 @@ Review text: ${reviewText || '(no comment)'}
 Reviewer language: ${language}`;
 
   const response = await client.chat.completions.create({
-    model: 'gpt-4o',
+    model: 'gpt-4.5-mini',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userMessage }
     ],
+    reasoning_effort: null,
     temperature: 0.7,
     max_tokens: 200
   });
