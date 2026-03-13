@@ -122,30 +122,30 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Review text + random button */}
-        <div style={styles.labelRow}>
-          <label style={{ ...styles.label, marginBottom: 0 }}>
-            Review text <span style={styles.optional}>(leave blank for star-only)</span>
-          </label>
-          <button onClick={loadRandom} style={{ ...styles.randomBtn, ...(randomFlash ? styles.randomFlash : {}) }}>
-            ↻ Random
-          </button>
-        </div>
+        {/* Review text */}
+        <label style={styles.label}>
+          Review text <span style={styles.optional}>(leave blank for star-only)</span>
+        </label>
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
           placeholder="Paste a review or hit Random..."
           rows={4}
-          style={{ ...styles.textarea, marginTop: 8 }}
+          style={styles.textarea}
         />
 
-        <button
-          onClick={generate}
-          disabled={loading}
-          style={{ ...styles.btn, ...(loading ? styles.btnDisabled : {}) }}
-        >
-          {loading ? 'Generating...' : 'Generate reply'}
-        </button>
+        <div style={styles.btnRow}>
+          <button
+            onClick={generate}
+            disabled={loading}
+            style={{ ...styles.btn, ...(loading ? styles.btnDisabled : {}) }}
+          >
+            {loading ? 'Generating...' : 'Generate reply'}
+          </button>
+          <button onClick={loadRandom} style={{ ...styles.randomBtn, ...(randomFlash ? styles.randomFlash : {}) }}>
+            ↻ Random
+          </button>
+        </div>
 
         {error && <p style={styles.error}>{error}</p>}
 
@@ -188,7 +188,7 @@ const styles = {
   label: { display: 'block', color: '#aaa', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 },
   optional: { color: '#555', fontWeight: 400, textTransform: 'none', letterSpacing: 0 },
   labelRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 },
-  randomBtn: { background: 'none', border: '1px solid #333', color: '#888', fontSize: 12, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 500, transition: 'background 0.15s' },
+  randomBtn: { background: 'none', border: '1px solid #333', color: '#aaa', fontSize: 15, padding: '12px 20px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, transition: 'background 0.15s', whiteSpace: 'nowrap' },
   randomFlash: { background: '#2a2a2a', color: '#fff', borderColor: '#555' },
   stars: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 20 },
   starBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 26, color: '#555', padding: 0, lineHeight: 1 },
@@ -202,8 +202,9 @@ const styles = {
     borderRadius: 8, color: '#fff', fontSize: 14, padding: '10px 12px', resize: 'vertical',
     outline: 'none', marginBottom: 16, fontFamily: 'inherit', lineHeight: 1.5
   },
+  btnRow: { display: 'flex', gap: 10, marginBottom: 0 },
   btn: {
-    width: '100%', padding: '12px', background: '#c8102e', color: '#fff',
+    flex: 1, padding: '12px', background: '#c8102e', color: '#fff',
     border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer'
   },
   btnDisabled: { background: '#5a0a14', cursor: 'not-allowed' },
