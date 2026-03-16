@@ -39,6 +39,17 @@ Reviewer language: ${language}`;
     reasoning: { effort: 'minimal' }
   });
 
+  // Log token usage so we can track cost per reply
+  const u = response.usage;
+  if (u) {
+    const input = u.input_tokens || 0;
+    const output = u.output_tokens || 0;
+    const reasoning = u.output_tokens_details?.reasoning_tokens || 0;
+    // gpt-5-mini pricing (per 1M tokens): input $1.10, output $4.40
+    const cost = ((input * 1.10) + (output * 4.40)) / 1_000_000;
+    console.log(`  [tokens] input:${input} output:${output} reasoning:${reasoning} | est. $${cost.toFixed(5)}`);
+  }
+
   return response.output_text.trim();
 }
 
@@ -50,7 +61,11 @@ if (require.main === module) {
     { stars: 5, text: 'Adorei os cocktails e os hambúrgueres. Vamos definitivamente voltar!', lang: 'PT' },
     { stars: 1, text: 'Terrible service, the waiter ignored us for 30 minutes.', lang: 'EN' },
     { stars: 3, text: '', lang: 'PT' },
-    { stars: 4, text: 'La comida estaba muy buena pero el servicio fue lento.', lang: 'ES' }
+    { stars: 4, text: 'La comida estaba muy buena pero el servicio fue lento.', lang: 'ES' },
+    { stars: 5, text: 'Amazing!', lang: 'EN' },
+    { stars: 1, text: 'Um local péssimo, com atendimento mal educado. O atendente Tiago não deveria estar a trabalhar com público.', lang: 'PT' },
+    { stars: 2, text: 'Catastrophique ! Service très désagréable et prix exorbitants.', lang: 'FR' },
+    { stars: 1, text: 'Fomos maltratados pelo Gerente por causa de uma reserva no The Fork com desconto.', lang: 'PT' }
   ];
 
   (async () => {
