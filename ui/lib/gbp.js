@@ -1,0 +1,97 @@
+// ui/lib/gbp.js — GBP API client (ES module for use in Next.js API routes)
+// Logic mirrors root/gbp_reviews.js but uses ES module syntax
+
+// Hardcoded location — confirmed in Step 1 validation
+const ACCOUNT_NAME = 'accounts/118040028723957039356';
+export const LOCATION_NAME = 'accounts/118040028723957039356/locations/11127497546250661444';
+
+// Credentials come from Vercel env vars
+function getCredentials() {
+  return {
+    client_id: process.env.GBP_CLIENT_ID,
+    client_secret: process.env.GBP_CLIENT_SECRET,
+    refresh_token: process.env.GBP_REFRESH_TOKEN
+  };
+}
+
+export async function getAccessToken() {
+  const { client_id, client_secret, refresh_token } = getCredentials();
+  if (!client_id || !client_secret || !refresh_token) {
+    throw new Error('GBP_CLIENT_ID, GBP_CLIENT_SECRET, or GBP_REFRESH_TOKEN env vars not set');
+  }
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ refresh_token, client_id, client_secret, grant_type: 'refresh_token' })
+  });
+  const data = await res.json();
+  if (!data.access_token) throw new Error(`Token refresh failed: ${JSON.stringify(data)}`);
+  return data.access_token;
+}
+
+// Convert GBP star string to number
+const STAR_MAP = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
+
+export function normalizeReview(r) {
+  const stars = typeof r.starRating === 'number' ? r.starRating : (STAR_MAP[r.starRating] || 0);
+  return {
+    reviewId: r.reviewId,
+    reviewer: r.reviewer?.displayName || 'Anonymous',
+    starRating: stars,
+    comment: r.comment || '',
+    createTime: r.createTime,
+    updateTime: r.updateTime || r.createTime,
+    reviewReply: r.reviewReply?.comment || null,
+    reviewReplyTime: r.reviewReply?.updateTime || null,
+    source: 'gbp',
+    _rawName: r.name
+  };
+}
+
+export async function fetchReviews(accessToken, pageSize = 50, pageToken = null) {
+  let url = `https://mybusiness.googleapis.com/v4/${LOCATION_NAME}/reviews?pageSize=${pageSize}`;
+  if (pageToken) url += `&pageToken=${encodeURIComponent(pageToken)}`;
+
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const data = await res.json();
+  if (data.error) throw new Error(`GBP API error: ${JSON.stringify(data.error)}`);
+
+  return {
+    reviews: data.reviews || [],
+    nextPageToken: data.nextPageToken || null,
+    totalReviewCount: data.totalReviewCount || 0
+  };
+}
+
+export async function fetchAllNewReviews(since = null) {
+  const accessToken = await getAccessToken();
+  const sinceDate = since ? new Date(since) : null;
+  const allReviews = [];
+  let pageToken = null;
+
+  do {
+    const { reviews, nextPageToken } = await fetchReviews(accessToken, 50, pageToken);
+    pageToken = nextPageToken;
+
+    for (const r of reviews) {
+      if (sinceDate && new Date(r.createTime) <= sinceDate) {
+        pageToken = null;
+        break;
+      }
+      allReviews.push(normalizeReview(r));
+    }
+  } while (pageToken);
+
+  return allReviews;
+}
+
+export async function postReply(reviewName, replyText) {
+  const accessToken = await getAccessToken();
+  const res = await fetch(`https://mybusiness.googleapis.com/v4/${reviewName}/reply`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ comment: replyText })
+  });
+  return res.json();
+}
