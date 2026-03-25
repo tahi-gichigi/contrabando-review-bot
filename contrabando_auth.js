@@ -133,7 +133,8 @@ async function pullReviews(accessToken) {
   });
 
   // Use the first location (adjust if needed)
-  const locationName = locations.locations[0].name;
+  // Reviews API needs full path: accounts/{id}/locations/{id}
+  const locationName = `${accountName}/${locations.locations[0].name}`;
   console.log(`\nPulling reviews for: ${locations.locations[0].title}`);
 
   const reviews = await getAllReviews(accessToken, locationName);
