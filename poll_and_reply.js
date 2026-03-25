@@ -30,12 +30,20 @@ function saveState(state) {
 }
 
 // --- Language detection ---
-// Simple heuristic based on character sets and common words.
-// Good enough for PT/EN/ES/FR/IT at low cost (no external API needed).
+// Simple heuristic based on common words.
+// GBP sometimes returns "(Translated by Google) ..." before "(Original) ..." —
+// we strip the translation and detect on the original text only.
+function stripGoogleTranslation(text) {
+  if (!text) return text;
+  // Match "(Original)\n..." or "(Original) ..." and return everything after it
+  const match = text.match(/\(Original\)\s*\n?([\s\S]*)/i);
+  return match ? match[1].trim() : text;
+}
+
 function detectLanguage(text) {
   if (!text || text.trim() === '') return 'PT'; // Default to PT for star-only reviews
 
-  const t = text.toLowerCase();
+  const t = stripGoogleTranslation(text).toLowerCase();
 
   // Strong signals first
   if (/\b(the|and|was|were|very|great|good|bad|not|this|with|have|for)\b/.test(t)) return 'EN';
@@ -44,7 +52,6 @@ function detectLanguage(text) {
   if (/\b(très|était|service|bonne|mauvais|prix|merci|bien|avec|pour)\b/.test(t)) return 'FR';
   if (/\b(molto|buono|servizio|cibo|ottimo|pessimo|grazie|erano|stato)\b/.test(t)) return 'IT';
 
-  // Fall back to PT (most common at this location)
   return 'PT';
 }
 
@@ -120,7 +127,13 @@ async function run({ dryRun = false } = {}) {
     }
   }
 
-  // Update state
+  // Trim repliedReviewIds to last 500 entries to prevent unbounded growth.
+  // lastPollTime already filters older reviews, so we only need recent IDs
+  // as a safety net against re-processing within the poll window.
+  if (state.repliedReviewIds.length > 500) {
+    state.repliedReviewIds = state.repliedReviewIds.slice(-500);
+  }
+
   state.lastPollTime = new Date().toISOString();
   if (!dryRun) saveState(state);
 

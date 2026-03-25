@@ -14,7 +14,13 @@ function getCredentials() {
   };
 }
 
+// Cache token for the duration of one serverless invocation
+let _cachedToken = null;
+let _tokenExpiry = 0;
+
 export async function getAccessToken() {
+  if (_cachedToken && Date.now() < _tokenExpiry) return _cachedToken;
+
   const { client_id, client_secret, refresh_token } = getCredentials();
   if (!client_id || !client_secret || !refresh_token) {
     throw new Error('GBP_CLIENT_ID, GBP_CLIENT_SECRET, or GBP_REFRESH_TOKEN env vars not set');
@@ -27,7 +33,10 @@ export async function getAccessToken() {
   });
   const data = await res.json();
   if (!data.access_token) throw new Error(`Token refresh failed: ${JSON.stringify(data)}`);
-  return data.access_token;
+
+  _cachedToken = data.access_token;
+  _tokenExpiry = Date.now() + ((data.expires_in || 3600) - 300) * 1000;
+  return _cachedToken;
 }
 
 // Convert GBP star string to number

@@ -27,11 +27,19 @@ function getRefreshToken() {
   return token.refresh_token;
 }
 
+// Cache the access token for the duration of one run (~1 hour expiry).
+// Avoids refreshing on every API call when replying to multiple reviews.
+let _cachedToken = null;
+let _tokenExpiry = 0;
+
 /**
  * Get a fresh access token using the stored refresh token.
+ * Caches the token until it's within 5 minutes of expiry.
  * @returns {Promise<string>} access_token
  */
 async function getAccessToken() {
+  if (_cachedToken && Date.now() < _tokenExpiry) return _cachedToken;
+
   const { client_id, client_secret } = getCredentials();
   const refresh_token = getRefreshToken();
 
@@ -42,7 +50,11 @@ async function getAccessToken() {
   });
   const data = await res.json();
   if (!data.access_token) throw new Error(`Token refresh failed: ${JSON.stringify(data)}`);
-  return data.access_token;
+
+  _cachedToken = data.access_token;
+  // Google tokens expire in 3600s — cache until 5 min before expiry
+  _tokenExpiry = Date.now() + ((data.expires_in || 3600) - 300) * 1000;
+  return _cachedToken;
 }
 
 /**
