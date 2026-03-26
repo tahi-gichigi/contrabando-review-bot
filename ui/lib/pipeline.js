@@ -1,6 +1,6 @@
 // ui/lib/pipeline.js — poll-and-reply pipeline (ES module for Vercel Cron)
-// State is stored in Vercel KV when deployed.
-// Without KV, logs a warning and refuses to run (would be a no-op anyway).
+// State is stored in Supabase (fortress project, contrabando_state table).
+// Without SUPABASE_SERVICE_ROLE_KEY, logs a warning and starts fresh each run.
 
 import { fetchAllNewReviews, fetchSingleReview, postReply, LOCATION_NAME } from './gbp.js';
 import { sendWhatsApp, sendAlert } from './notify.js';
@@ -29,30 +29,54 @@ function detectLanguage(text) {
   return 'PT';
 }
 
-// --- State via Vercel KV ---
-async function getKV() {
-  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) return null;
-  const { kv } = await import('@vercel/kv');
-  return kv;
-}
+// --- State via Supabase (fortress project) ---
+// Replaced Vercel KV (deprecated) with Supabase REST API for state persistence.
+// Table: contrabando_state (key TEXT PRIMARY KEY, value JSONB, updated_at TIMESTAMPTZ)
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://pfbiumyuxnymddnqraxv.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const STATE_KEY = 'contrabando:poll-state';
 
 async function loadState() {
-  const kv = await getKV();
-  if (kv) {
-    const state = await kv.get('contrabando:poll-state');
-    if (state) return state;
+  if (!SUPABASE_KEY) {
+    console.warn('[pipeline] No SUPABASE_SERVICE_ROLE_KEY — state NOT loaded. Starting from now.');
+    return { lastPollTime: new Date().toISOString(), repliedReviewIds: [] };
   }
-  // No KV or first run — start from now to avoid processing old reviews
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/contrabando_state?key=eq.${encodeURIComponent(STATE_KEY)}&select=value`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    const rows = await res.json();
+    if (rows && rows.length > 0 && rows[0].value) return rows[0].value;
+  } catch (err) {
+    console.warn('[pipeline] State load failed:', err.message);
+  }
+  // First run or error — start from now to avoid processing old reviews
   return { lastPollTime: new Date().toISOString(), repliedReviewIds: [] };
 }
 
 async function saveState(state) {
-  const kv = await getKV();
-  if (!kv) {
-    console.warn('[pipeline] No Vercel KV — state NOT saved. Next run will start from now.');
+  if (!SUPABASE_KEY) {
+    console.warn('[pipeline] No SUPABASE_SERVICE_ROLE_KEY — state NOT saved.');
     return;
   }
-  await kv.set('contrabando:poll-state', state);
+  try {
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/contrabando_state`,
+      {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({ key: STATE_KEY, value: state, updated_at: new Date().toISOString() })
+      }
+    );
+  } catch (err) {
+    console.warn('[pipeline] State save failed:', err.message);
+  }
 }
 
 // --- Reply generation ---
@@ -83,7 +107,7 @@ function getSystemPrompt() {
 async function generateReply(starRating, reviewText, language) {
   const client = getOpenAIClient();
   const response = await client.responses.create({
-    model: 'gpt-5-mini',
+    model: 'gpt-4o-mini',
     instructions: getSystemPrompt(),
     input: `Star rating: ${starRating}\nReview text: ${reviewText || '(no comment)'}\nReviewer language: ${language}`,
     reasoning: { effort: 'minimal' }
@@ -105,9 +129,9 @@ export async function run({ dryRun = false } = {}) {
 }
 
 async function _run({ dryRun = false } = {}) {
-  // Warn loudly if no KV in production — cron will be a no-op
-  if (!process.env.KV_REST_API_URL && process.env.VERCEL) {
-    console.error('[pipeline] WARNING: No Vercel KV configured. State will not persist between runs. Set up KV or the cron is effectively a no-op.');
+  // Warn loudly if no Supabase key in production — cron will be a no-op
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.VERCEL) {
+    console.error('[pipeline] WARNING: No SUPABASE_SERVICE_ROLE_KEY configured. State will not persist between runs. Pipeline is a no-op until key is set.');
   }
 
   const state = await loadState();
