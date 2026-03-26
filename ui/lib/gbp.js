@@ -1,5 +1,8 @@
 // ui/lib/gbp.js — GBP API client (ES module for use in Next.js API routes)
-// Logic mirrors root/gbp_reviews.js but uses ES module syntax
+// Logic mirrors root/gbp_reviews.js but uses ES module syntax.
+// NOTE: After the OAuth consent screen is published, the refresh token is permanent.
+// It only needs to be re-issued if the user (tahi@mooch.agency) manually revokes access
+// in their Google account security settings. Day-to-day, the token auto-refreshes.
 
 // Hardcoded location — confirmed in Step 1 validation
 const ACCOUNT_NAME = 'accounts/118040028723957039356';
@@ -93,6 +96,25 @@ export async function fetchAllNewReviews(since = null) {
   } while (pageToken);
 
   return allReviews;
+}
+
+/**
+ * Fetch a single review by its full resource name to confirm current reply status.
+ * Used as a double-check before posting a reply to prevent duplicate replies.
+ * @param {string} reviewName - full resource name e.g. "accounts/.../locations/.../reviews/..."
+ * @returns {Promise<object|null>} normalized review or null on error
+ */
+export async function fetchSingleReview(reviewName) {
+  const accessToken = await getAccessToken();
+  const res = await fetch(`https://mybusiness.googleapis.com/v4/${reviewName}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const data = await res.json();
+  if (data.error) {
+    console.warn(`[gbp] fetchSingleReview error: ${JSON.stringify(data.error)}`);
+    return null;
+  }
+  return normalizeReview(data);
 }
 
 export async function postReply(reviewName, replyText) {

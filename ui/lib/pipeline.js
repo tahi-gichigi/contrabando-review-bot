@@ -2,8 +2,12 @@
 // State is stored in Vercel KV when deployed.
 // Without KV, logs a warning and refuses to run (would be a no-op anyway).
 
-import { fetchAllNewReviews, postReply, LOCATION_NAME } from './gbp.js';
-import { sendWhatsApp } from './notify.js';
+import { fetchAllNewReviews, fetchSingleReview, postReply, LOCATION_NAME } from './gbp.js';
+import { sendWhatsApp, sendAlert } from './notify.js';
+
+// Safety cap: never process more than this many reviews in a single run.
+// Prevents a state reset from triggering mass-replies to hundreds of old reviews.
+const MAX_REPLIES_PER_RUN = 20;
 
 // --- Language detection ---
 // GBP returns "(Translated by Google) ..." before "(Original) ..." for non-English reviews.
@@ -38,7 +42,7 @@ async function loadState() {
     const state = await kv.get('contrabando:poll-state');
     if (state) return state;
   }
-  // No KV or first run — return default state
+  // No KV or first run — start from now to avoid processing old reviews
   return { lastPollTime: new Date().toISOString(), repliedReviewIds: [] };
 }
 
@@ -89,6 +93,18 @@ async function generateReply(starRating, reviewText, language) {
 
 // --- Main pipeline ---
 export async function run({ dryRun = false } = {}) {
+  // Wrap everything in a top-level try/catch to fire an alert on unhandled exceptions
+  try {
+    return await _run({ dryRun });
+  } catch (err) {
+    console.error('[pipeline] Unhandled exception:', err.message);
+    // Fire-and-forget alert — don't let the alert failure mask the original error
+    sendAlert(`Unhandled exception in poll-and-reply:\n${err.message}`).catch(() => {});
+    throw err;
+  }
+}
+
+async function _run({ dryRun = false } = {}) {
   // Warn loudly if no KV in production — cron will be a no-op
   if (!process.env.KV_REST_API_URL && process.env.VERCEL) {
     console.error('[pipeline] WARNING: No Vercel KV configured. State will not persist between runs. Set up KV or the cron is effectively a no-op.');
@@ -97,7 +113,17 @@ export async function run({ dryRun = false } = {}) {
   const state = await loadState();
   console.log(`[pipeline] Last poll: ${state.lastPollTime}, replied to ${state.repliedReviewIds.length} reviews`);
 
-  const newReviews = await fetchAllNewReviews(state.lastPollTime);
+  // Token refresh failure should alert immediately — don't silently miss all reviews
+  let newReviews;
+  try {
+    newReviews = await fetchAllNewReviews(state.lastPollTime);
+  } catch (err) {
+    const isTokenError = err.message.includes('Token refresh failed') || err.message.includes('env vars not set');
+    if (isTokenError) {
+      await sendAlert(`GBP token refresh failed — OAuth re-auth may be needed.\n${err.message}`);
+    }
+    throw err;
+  }
   console.log(`[pipeline] ${newReviews.length} new reviews since last poll`);
 
   const unreplied = newReviews.filter(r =>
@@ -105,12 +131,19 @@ export async function run({ dryRun = false } = {}) {
   );
   console.log(`[pipeline] ${unreplied.length} unreplied`);
 
+  // Safety cap: if we somehow have more than MAX_REPLIES_PER_RUN unreplied, process in batches
+  if (unreplied.length > MAX_REPLIES_PER_RUN) {
+    console.warn(`[pipeline] WARNING: ${unreplied.length} unreplied reviews exceeds cap of ${MAX_REPLIES_PER_RUN}. Processing first ${MAX_REPLIES_PER_RUN} only. Run again to process more.`);
+  }
+  const toProcess = unreplied.slice(0, MAX_REPLIES_PER_RUN);
+
   let replied = 0;
   let errors = 0;
 
-  for (const review of unreplied) {
+  for (const review of toProcess) {
     const { starRating, reviewer, comment, reviewId } = review;
     const lang = detectLanguage(comment);
+    const reviewName = `${LOCATION_NAME}/reviews/${reviewId}`;
     console.log(`  ★${starRating} [${lang}] ${reviewer}: "${(comment || '').slice(0, 60)}"`);
 
     try {
@@ -118,11 +151,25 @@ export async function run({ dryRun = false } = {}) {
       console.log(`  → "${reply}"`);
 
       if (!dryRun) {
-        const reviewName = `${LOCATION_NAME}/reviews/${reviewId}`;
+        // Double-check: re-fetch this review to confirm it still has no reply before posting.
+        // Guards against race conditions or manual replies added between our fetch and post.
+        const current = await fetchSingleReview(reviewName);
+        if (current && current.reviewReply) {
+          console.log(`  [skip] Review ${reviewId} already has a reply (added since fetch) — skipping`);
+          state.repliedReviewIds.push(reviewId);
+          // Atomic save after each update
+          await saveState(state);
+          continue;
+        }
+
         const result = await postReply(reviewName, reply);
         if (result.error) throw new Error(JSON.stringify(result.error));
 
+        // Atomic state save: persist after each successful reply, not just at the end.
+        // If the process crashes mid-batch, we won't re-reply to already-replied reviews.
         state.repliedReviewIds.push(reviewId);
+        await saveState(state);
+
         replied++;
 
         if (starRating <= 2) await sendWhatsApp(starRating, reviewer, comment);
@@ -143,5 +190,12 @@ export async function run({ dryRun = false } = {}) {
   state.lastPollTime = new Date().toISOString();
   if (!dryRun) await saveState(state);
 
-  return { processed: unreplied.length, replied, errors };
+  const result = { processed: unreplied.length, replied, errors };
+
+  // Alert if the run completed with errors
+  if (errors > 0) {
+    await sendAlert(`Pipeline run completed with ${errors} error(s).\nProcessed: ${unreplied.length}, Replied: ${replied}, Errors: ${errors}`).catch(() => {});
+  }
+
+  return result;
 }

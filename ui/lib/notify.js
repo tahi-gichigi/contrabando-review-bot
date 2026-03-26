@@ -28,6 +28,36 @@ export async function sendWhatsApp(starRating, reviewerName, comment) {
   return sendEmail(starRating, reviewerName, comment);
 }
 
+/**
+ * Send a pipeline alert (not a review notification).
+ * Used when the pipeline encounters errors or an unhandled exception.
+ * @param {string} message - alert text
+ */
+export async function sendAlert(message) {
+  const phone = process.env.CALLMEBOT_PHONE;
+  const apiKey = process.env.CALLMEBOT_APIKEY;
+
+  const alertText = `[Contrabando Bot Alert]\n${message}`;
+
+  if (phone && apiKey) {
+    const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(alertText)}&apikey=${encodeURIComponent(apiKey)}`;
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        console.log('[notify] Alert sent via WhatsApp');
+        return true;
+      }
+      console.warn(`[notify] Alert WhatsApp failed: ${res.status}`);
+    } catch (err) {
+      console.warn(`[notify] Alert WhatsApp error: ${err.message}`);
+    }
+  } else {
+    console.warn('[notify] sendAlert: CALLMEBOT env vars not set, alert not sent');
+  }
+
+  return false;
+}
+
 async function sendEmail(starRating, reviewerName, comment) {
   // nodemailer is not installed in ui/ by default — add if needed
   console.warn('[notify] Email fallback not implemented in Vercel env yet');
