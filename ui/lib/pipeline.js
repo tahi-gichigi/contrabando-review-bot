@@ -102,7 +102,7 @@ function getSystemPrompt() {
 async function generateReply(starRating, reviewText, language) {
   const client = getOpenAIClient();
   const response = await client.responses.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-mini',
     instructions: getSystemPrompt(),
     input: `Star rating: ${starRating}\nReview text: ${reviewText || '(no comment)'}\nReviewer language: ${language}`,
     reasoning: { effort: 'minimal' }
