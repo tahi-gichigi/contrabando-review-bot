@@ -29,30 +29,51 @@ function detectLanguage(text) {
   return 'PT';
 }
 
-// --- State via Vercel KV ---
-async function getKV() {
-  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) return null;
-  const { kv } = await import('@vercel/kv');
-  return kv;
-}
+// --- State via Supabase (contrabando_state table in fortress project) ---
+// Table: contrabando_state (id text PK, state jsonb, updated_at timestamptz)
+// Hosted in fortress Supabase project (pfbiumyuxnymddnqraxv) — namespaced clearly.
+// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in Vercel env vars.
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://pfbiumyuxnymddnqraxv.supabase.co';
+const STATE_KEY = 'contrabando-poll-state';
 
 async function loadState() {
-  const kv = await getKV();
-  if (kv) {
-    const state = await kv.get('contrabando:poll-state');
-    if (state) return state;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) {
+    console.warn('[pipeline] No SUPABASE_SERVICE_ROLE_KEY — state NOT persisted. Starting from now.');
+    return { lastPollTime: new Date().toISOString(), repliedReviewIds: [] };
   }
-  // No KV or first run — start from now to avoid processing old reviews
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/contrabando_state?key=eq.${STATE_KEY}&select=state`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` }
+    });
+    const rows = await res.json();
+    if (rows && rows[0]) return rows[0].value;
+  } catch (e) {
+    console.warn('[pipeline] Failed to load state:', e.message);
+  }
   return { lastPollTime: new Date().toISOString(), repliedReviewIds: [] };
 }
 
 async function saveState(state) {
-  const kv = await getKV();
-  if (!kv) {
-    console.warn('[pipeline] No Vercel KV — state NOT saved. Next run will start from now.');
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) {
+    console.warn('[pipeline] No SUPABASE_SERVICE_ROLE_KEY — state NOT saved.');
     return;
   }
-  await kv.set('contrabando:poll-state', state);
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/contrabando_state`, {
+      method: 'POST',
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ key: STATE_KEY, value: state, updated_at: new Date().toISOString() })
+    });
+  } catch (e) {
+    console.warn('[pipeline] Failed to save state:', e.message);
+  }
 }
 
 // --- Reply generation ---

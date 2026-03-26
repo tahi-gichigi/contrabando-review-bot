@@ -5,3 +5,4 @@ reviews_serpapi.json
 reviews_sample.json
 node_modules/
 state.json
+.vercel
