@@ -1,6 +1,6 @@
 // ui/lib/pipeline.js — poll-and-reply pipeline (ES module for Vercel Cron)
-// State is stored in Supabase (fortress project, contrabando_state table).
-// Without SUPABASE_SERVICE_ROLE_KEY, logs a warning and starts fresh each run.
+// State is stored in Neon Postgres (dedicated to this project via Vercel integration).
+// Without DATABASE_URL, logs a warning and starts fresh each run.
 
 import { fetchAllNewReviews, fetchSingleReview, postReply, LOCATION_NAME } from './gbp.js';
 import { sendWhatsApp, sendAlert } from './notify.js';
@@ -29,50 +29,45 @@ function detectLanguage(text) {
   return 'PT';
 }
 
-// --- State via Supabase (fortress project) ---
-// Replaced Vercel KV (deprecated) with Supabase REST API for state persistence.
+// --- State via Neon Postgres (dedicated to this project via Vercel integration) ---
 // Table: contrabando_state (key TEXT PRIMARY KEY, value JSONB, updated_at TIMESTAMPTZ)
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://pfbiumyuxnymddnqraxv.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// DATABASE_URL is auto-injected by Vercel's Neon integration.
 const STATE_KEY = 'contrabando:poll-state';
 
+async function queryNeon(sql, params = []) {
+  const { neon } = await import('@neondatabase/serverless');
+  const sql_fn = neon(process.env.DATABASE_URL);
+  return sql_fn(sql, params);
+}
+
 async function loadState() {
-  if (!SUPABASE_KEY) {
-    console.warn('[pipeline] No SUPABASE_SERVICE_ROLE_KEY — state NOT loaded. Starting from now.');
+  if (!process.env.DATABASE_URL) {
+    console.warn('[pipeline] No DATABASE_URL — state NOT persisted. Starting from now.');
     return { lastPollTime: new Date().toISOString(), repliedReviewIds: [] };
   }
   try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/contrabando_state?key=eq.${encodeURIComponent(STATE_KEY)}&select=value`,
-      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    const rows = await queryNeon(
+      'SELECT value FROM contrabando_state WHERE key = $1',
+      [STATE_KEY]
     );
-    const rows = await res.json();
-    if (rows && rows.length > 0 && rows[0].value) return rows[0].value;
+    if (rows && rows.length > 0) return rows[0].value;
   } catch (err) {
     console.warn('[pipeline] State load failed:', err.message);
   }
-  // First run or error — start from now to avoid processing old reviews
   return { lastPollTime: new Date().toISOString(), repliedReviewIds: [] };
 }
 
 async function saveState(state) {
-  if (!SUPABASE_KEY) {
-    console.warn('[pipeline] No SUPABASE_SERVICE_ROLE_KEY — state NOT saved.');
+  if (!process.env.DATABASE_URL) {
+    console.warn('[pipeline] No DATABASE_URL — state NOT saved.');
     return;
   }
   try {
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/contrabando_state`,
-      {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'resolution=merge-duplicates'
-        },
-        body: JSON.stringify({ key: STATE_KEY, value: state, updated_at: new Date().toISOString() })
-      }
+    await queryNeon(
+      `INSERT INTO contrabando_state (key, value, updated_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+      [STATE_KEY, JSON.stringify(state)]
     );
   } catch (err) {
     console.warn('[pipeline] State save failed:', err.message);
@@ -130,8 +125,8 @@ export async function run({ dryRun = false } = {}) {
 
 async function _run({ dryRun = false } = {}) {
   // Warn loudly if no Supabase key in production — cron will be a no-op
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.VERCEL) {
-    console.error('[pipeline] WARNING: No SUPABASE_SERVICE_ROLE_KEY configured. State will not persist between runs. Pipeline is a no-op until key is set.');
+  if (!process.env.DATABASE_URL && process.env.VERCEL) {
+    console.error('[pipeline] WARNING: No DATABASE_URL configured. State will not persist between runs. Pipeline is a no-op until key is set.');
   }
 
   const state = await loadState();
