@@ -1,6 +1,6 @@
 // ui/lib/notify.js — WhatsApp + email alerts (ES module for Next.js)
 
-export async function sendWhatsApp(starRating, reviewerName, comment) {
+export async function sendWhatsApp(starRating, reviewerName, comment, locationLabel = 'Almada') {
   const phone = process.env.CALLMEBOT_PHONE;
   const apiKey = process.env.CALLMEBOT_APIKEY;
 
@@ -11,7 +11,7 @@ export async function sendWhatsApp(starRating, reviewerName, comment) {
 
   const stars = '⭐'.repeat(starRating);
   const snippet = (comment || '(no comment)').slice(0, 100);
-  const text = `${stars} ${starRating}/5 — ${reviewerName}\n"${snippet}"\n[Contrabando Almada]`;
+  const text = `${stars} ${starRating}/5 — ${reviewerName}\n"${snippet}"\n[Contrabando ${locationLabel}]`;
   const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(apiKey)}`;
 
   try {

@@ -20,15 +20,17 @@ async function _load() {
  */
 if (require.main === module) {
   (async () => {
-    const { getAccessToken, fetchReviews, normalizeReview } = await _load();
-    console.log('Fetching 5 most recent reviews...');
+    const { getAccessToken, fetchReviews, normalizeReview, LOCATIONS } = await _load();
     const token = await getAccessToken();
-    const { reviews, totalReviewCount } = await fetchReviews(token, 5);
-    console.log(`Total reviews on profile: ${totalReviewCount}`);
-    reviews.forEach(r => {
-      const n = normalizeReview(r);
-      console.log(`  ★${n.starRating} — ${n.reviewer}: "${(n.comment || '').slice(0, 60)}..." [replied: ${!!n.reviewReply}]`);
-    });
+    for (const loc of LOCATIONS) {
+      console.log(`\n--- ${loc.label} ---`);
+      const { reviews, totalReviewCount } = await fetchReviews(token, loc.name, 3);
+      console.log(`Total reviews: ${totalReviewCount}`);
+      reviews.forEach(r => {
+        const n = normalizeReview(r);
+        console.log(`  ★${n.starRating} — ${n.reviewer}: "${(n.comment || '').slice(0, 60)}..." [replied: ${!!n.reviewReply}]`);
+      });
+    }
   })().catch(console.error);
 }
 
@@ -37,5 +39,6 @@ module.exports = {
   fetchAllNewReviews: async (...args) => (await _load()).fetchAllNewReviews(...args),
   postReply: async (...args) => (await _load()).postReply(...args),
   getAccessToken: async (...args) => (await _load()).getAccessToken(...args),
-  get LOCATION_NAME() { return _module ? _module.LOCATION_NAME : null; }
+  get LOCATION_NAME() { return _module ? _module.LOCATION_NAME : null; },
+  get LOCATIONS() { return _module ? _module.LOCATIONS : null; }
 };

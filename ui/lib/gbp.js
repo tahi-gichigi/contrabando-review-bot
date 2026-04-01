@@ -4,9 +4,19 @@
 // It only needs to be re-issued if the user (tahi@mooch.agency) manually revokes access
 // in their Google account security settings. Day-to-day, the token auto-refreshes.
 
-// Hardcoded location — confirmed in Step 1 validation
+// GBP account + all active Contrabando locations (confirmed via API 1 Apr 2026)
+// mooch.agency listing (locations/6712778551863965541) intentionally excluded
 const ACCOUNT_NAME = 'accounts/118040028723957039356';
-export const LOCATION_NAME = 'accounts/118040028723957039356/locations/11127497546250661444';
+
+export const LOCATIONS = [
+  { name: `${ACCOUNT_NAME}/locations/11127497546250661444`, label: 'Almada' },
+  { name: `${ACCOUNT_NAME}/locations/1889522572377605742`,  label: 'Saldanha' },
+  { name: `${ACCOUNT_NAME}/locations/11449354095755879662`, label: 'Av. 24 de Julho' },
+  { name: `${ACCOUNT_NAME}/locations/148727331392061285`,   label: 'Marina de Tróia' },
+];
+
+// Backwards-compat: default location for any code that still imports LOCATION_NAME
+export const LOCATION_NAME = LOCATIONS[0].name;
 
 // Credentials come from Vercel env vars
 function getCredentials() {
@@ -61,13 +71,14 @@ export function normalizeReview(r) {
   };
 }
 
-export async function fetchReviews(accessToken, pageSize = 50, pageToken = null) {
-  let url = `https://mybusiness.googleapis.com/v4/${LOCATION_NAME}/reviews?pageSize=${pageSize}`;
+// locationName is now a required parameter — no implicit default
+export async function fetchReviews(accessToken, locationName, pageSize = 50, pageToken = null) {
+  let url = `https://mybusiness.googleapis.com/v4/${locationName}/reviews?pageSize=${pageSize}`;
   if (pageToken) url += `&pageToken=${encodeURIComponent(pageToken)}`;
 
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   const data = await res.json();
-  if (data.error) throw new Error(`GBP API error: ${JSON.stringify(data.error)}`);
+  if (data.error) throw new Error(`GBP API error (${locationName}): ${JSON.stringify(data.error)}`);
 
   return {
     reviews: data.reviews || [],
@@ -76,25 +87,48 @@ export async function fetchReviews(accessToken, pageSize = 50, pageToken = null)
   };
 }
 
-export async function fetchAllNewReviews(since = null) {
+/**
+ * Fetch new reviews for a single location since the given timestamp.
+ * @param {string} locationName - full GBP resource name (accounts/.../locations/...)
+ * @param {string|null} since - ISO timestamp; null fetches all
+ */
+export async function fetchNewReviewsForLocation(locationName, since = null) {
   const accessToken = await getAccessToken();
   const sinceDate = since ? new Date(since) : null;
-  const allReviews = [];
+  const reviews = [];
   let pageToken = null;
 
   do {
-    const { reviews, nextPageToken } = await fetchReviews(accessToken, 50, pageToken);
+    const { reviews: page, nextPageToken } = await fetchReviews(accessToken, locationName, 50, pageToken);
     pageToken = nextPageToken;
 
-    for (const r of reviews) {
+    for (const r of page) {
       if (sinceDate && new Date(r.createTime) <= sinceDate) {
         pageToken = null;
         break;
       }
-      allReviews.push(normalizeReview(r));
+      reviews.push(normalizeReview(r));
     }
   } while (pageToken);
 
+  return reviews;
+}
+
+/**
+ * Fetch new reviews across ALL locations. Returns flat array with locationName on each review.
+ * @param {string|null} since - ISO timestamp
+ */
+export async function fetchAllNewReviews(since = null) {
+  const allReviews = [];
+  for (const loc of LOCATIONS) {
+    const reviews = await fetchNewReviewsForLocation(loc.name, since);
+    // Tag each review with its location so pipeline/summary can group by location
+    for (const r of reviews) {
+      r.locationName = loc.name;
+      r.locationLabel = loc.label;
+    }
+    allReviews.push(...reviews);
+  }
   return allReviews;
 }
 

@@ -2,7 +2,7 @@
 // State is stored in Neon Postgres (dedicated to this project via Vercel integration).
 // Without DATABASE_URL, logs a warning and starts fresh each run.
 
-import { fetchAllNewReviews, fetchSingleReview, postReply, LOCATION_NAME } from './gbp.js';
+import { fetchAllNewReviews, fetchSingleReview, postReply, LOCATIONS } from './gbp.js';
 import { sendWhatsApp, sendAlert } from './notify.js';
 
 // Safety cap: never process more than this many reviews in a single run.
@@ -40,21 +40,38 @@ async function queryNeon(sql, params = []) {
   return sql_fn(sql, params);
 }
 
+// Fresh state factory — repliedReviewIds is now an object keyed by location name
+function freshState() {
+  return { lastPollTime: new Date().toISOString(), repliedReviewIds: {} };
+}
+
 async function loadState() {
   if (!process.env.DATABASE_URL) {
     console.warn('[pipeline] No DATABASE_URL — state NOT persisted. Starting from now.');
-    return { lastPollTime: new Date().toISOString(), repliedReviewIds: [] };
+    return freshState();
   }
   try {
     const rows = await queryNeon(
       'SELECT value FROM contrabando_state WHERE key = $1',
       [STATE_KEY]
     );
-    if (rows && rows.length > 0) return rows[0].value;
+    if (rows && rows.length > 0) {
+      const state = rows[0].value;
+
+      // Migration: old flat array → per-location object.
+      // Existing IDs are assigned to Almada (the only location before this change).
+      if (Array.isArray(state.repliedReviewIds)) {
+        const almadaName = LOCATIONS[0].name; // Almada is index 0
+        console.log(`[pipeline] Migrating flat repliedReviewIds (${state.repliedReviewIds.length} IDs) to per-location format`);
+        state.repliedReviewIds = { [almadaName]: state.repliedReviewIds };
+      }
+
+      return state;
+    }
   } catch (err) {
     console.warn('[pipeline] State load failed:', err.message);
   }
-  return { lastPollTime: new Date().toISOString(), repliedReviewIds: [] };
+  return freshState();
 }
 
 async function saveState(state) {
@@ -130,7 +147,8 @@ async function _run({ dryRun = false } = {}) {
   }
 
   const state = await loadState();
-  console.log(`[pipeline] Last poll: ${state.lastPollTime}, replied to ${state.repliedReviewIds.length} reviews`);
+  const totalTracked = Object.values(state.repliedReviewIds).reduce((sum, ids) => sum + ids.length, 0);
+  console.log(`[pipeline] Last poll: ${state.lastPollTime}, tracking ${totalTracked} replied reviews across ${Object.keys(state.repliedReviewIds).length} locations`);
 
   // Token refresh failure should alert immediately — don't silently miss all reviews
   let newReviews;
@@ -145,9 +163,11 @@ async function _run({ dryRun = false } = {}) {
   }
   console.log(`[pipeline] ${newReviews.length} new reviews since last poll`);
 
-  const unreplied = newReviews.filter(r =>
-    !r.reviewReply && !state.repliedReviewIds.includes(r.reviewId)
-  );
+  // Filter unreplied — check per-location ID lists
+  const unreplied = newReviews.filter(r => {
+    const locIds = state.repliedReviewIds[r.locationName] || [];
+    return !r.reviewReply && !locIds.includes(r.reviewId);
+  });
   console.log(`[pipeline] ${unreplied.length} unreplied`);
 
   // Safety cap: if we somehow have more than MAX_REPLIES_PER_RUN unreplied, process in batches
@@ -160,10 +180,16 @@ async function _run({ dryRun = false } = {}) {
   let errors = 0;
 
   for (const review of toProcess) {
-    const { starRating, reviewer, comment, reviewId } = review;
+    const { starRating, reviewer, comment, reviewId, locationName, locationLabel } = review;
     const lang = detectLanguage(comment);
-    const reviewName = `${LOCATION_NAME}/reviews/${reviewId}`;
-    console.log(`  ★${starRating} [${lang}] ${reviewer}: "${(comment || '').slice(0, 60)}"`);
+    const reviewName = `${locationName}/reviews/${reviewId}`;
+    console.log(`  [${locationLabel}] ★${starRating} [${lang}] ${reviewer}: "${(comment || '').slice(0, 60)}"`);
+
+    // Helper to record a review ID in per-location state
+    const markReplied = (rid, locName) => {
+      if (!state.repliedReviewIds[locName]) state.repliedReviewIds[locName] = [];
+      state.repliedReviewIds[locName].push(rid);
+    };
 
     try {
       const reply = await generateReply(starRating, comment, lang);
@@ -175,8 +201,7 @@ async function _run({ dryRun = false } = {}) {
         const current = await fetchSingleReview(reviewName);
         if (current && current.reviewReply) {
           console.log(`  [skip] Review ${reviewId} already has a reply (added since fetch) — skipping`);
-          state.repliedReviewIds.push(reviewId);
-          // Atomic save after each update
+          markReplied(reviewId, locationName);
           await saveState(state);
           continue;
         }
@@ -186,24 +211,27 @@ async function _run({ dryRun = false } = {}) {
 
         // Atomic state save: persist after each successful reply, not just at the end.
         // If the process crashes mid-batch, we won't re-reply to already-replied reviews.
-        state.repliedReviewIds.push(reviewId);
+        markReplied(reviewId, locationName);
         await saveState(state);
 
         replied++;
 
-        if (starRating <= 2) await sendWhatsApp(starRating, reviewer, comment);
+        // Include location label in WhatsApp alert for low ratings
+        if (starRating <= 2) await sendWhatsApp(starRating, reviewer, comment, locationLabel);
       } else {
         replied++;
       }
     } catch (err) {
-      console.error(`  [error] ${err.message}`);
+      console.error(`  [error] [${locationLabel}] ${err.message}`);
       errors++;
     }
   }
 
-  // Cap repliedReviewIds to prevent unbounded growth
-  if (state.repliedReviewIds.length > 500) {
-    state.repliedReviewIds = state.repliedReviewIds.slice(-500);
+  // Cap repliedReviewIds per location to prevent unbounded growth
+  for (const locName of Object.keys(state.repliedReviewIds)) {
+    if (state.repliedReviewIds[locName].length > 500) {
+      state.repliedReviewIds[locName] = state.repliedReviewIds[locName].slice(-500);
+    }
   }
 
   state.lastPollTime = new Date().toISOString();
