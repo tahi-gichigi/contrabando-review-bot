@@ -1,6 +1,7 @@
 .env
 credentials.json
 token.json
+reviews.json
 reviews_serpapi.json
 reviews_sample.json
 node_modules/

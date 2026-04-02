@@ -12,10 +12,20 @@ const MAX_REPLIES_PER_RUN = 20;
 // --- Language detection ---
 // GBP returns "(Translated by Google) ..." before "(Original) ..." for non-English reviews.
 // We strip the translation and detect on the original text only.
+// Edge case: sometimes GBP returns only "(Translated by Google) ..." with no "(Original)" marker.
+// In that case we can't recover the original — return '' to force PT default in detectLanguage().
 function stripGoogleTranslation(text) {
   if (!text) return text;
-  const match = text.match(/\(Original\)\s*\n?([\s\S]*)/i);
-  return match ? match[1].trim() : text;
+
+  // Has both markers — extract original text after "(Original)"
+  const originalMatch = text.match(/\(Original\)\s*\n?([\s\S]*)/i);
+  if (originalMatch) return originalMatch[1].trim();
+
+  // Has translation prefix but no "(Original)" — we only have the EN translation, not the original
+  if (/^\(Translated by Google\)/i.test(text.trim())) return '';
+
+  // Native text, no markers
+  return text;
 }
 
 function detectLanguage(text) {
@@ -153,7 +163,13 @@ async function _run({ dryRun = false } = {}) {
   // Token refresh failure should alert immediately — don't silently miss all reviews
   let newReviews;
   try {
-    newReviews = await fetchAllNewReviews(state.lastPollTime);
+    // Apply a 2-hour lookback buffer: GBP API can propagate reviews with a delay,
+    // so we poll slightly behind lastPollTime to catch late-appearing reviews.
+    // The repliedReviewIds dedup prevents double-posting anything we already replied to.
+    const pollSince = state.lastPollTime
+      ? new Date(new Date(state.lastPollTime).getTime() - 2 * 60 * 60 * 1000).toISOString()
+      : state.lastPollTime;
+    newReviews = await fetchAllNewReviews(pollSince);
   } catch (err) {
     const isTokenError = err.message.includes('Token refresh failed') || err.message.includes('env vars not set');
     if (isTokenError) {
@@ -242,6 +258,12 @@ async function _run({ dryRun = false } = {}) {
   // Alert if the run completed with errors
   if (errors > 0) {
     await sendAlert(`Pipeline run completed with ${errors} error(s).\nProcessed: ${unreplied.length}, Replied: ${replied}, Errors: ${errors}`).catch(() => {});
+  }
+
+  // Ping Better Stack heartbeat — proves the cron ran successfully.
+  // If this ping stops arriving, Better Stack alerts via email.
+  if (!dryRun && process.env.BETTERSTACK_HEARTBEAT_URL) {
+    fetch(process.env.BETTERSTACK_HEARTBEAT_URL).catch(() => {});
   }
 
   return result;
