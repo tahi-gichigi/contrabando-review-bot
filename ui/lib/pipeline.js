@@ -263,7 +263,7 @@ async function _run({ dryRun = false } = {}) {
   // Ping Better Stack heartbeat — proves the cron ran successfully.
   // If this ping stops arriving, Better Stack alerts via email.
   if (!dryRun && process.env.BETTERSTACK_HEARTBEAT_URL) {
-    fetch(process.env.BETTERSTACK_HEARTBEAT_URL).catch(() => {});
+    await fetch(process.env.BETTERSTACK_HEARTBEAT_URL).catch(() => {});
   }
 
   return result;
