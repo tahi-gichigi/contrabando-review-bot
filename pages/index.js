@@ -90,7 +90,10 @@ export default function Home() {
     <main style={styles.page}>
       <div style={styles.card}>
         <h1 style={styles.title}>Contrabando</h1>
-        <p style={styles.subtitle}>Google Review Reply Generator</p>
+        <div style={styles.titleRow}>
+          <p style={styles.subtitle}>Google Review Reply Generator</p>
+          <a href="/stats" style={styles.statsLink}>Stats →</a>
+        </div>
 
         {/* Star rating */}
         <label style={styles.label}>Star rating</label>
@@ -184,7 +187,9 @@ const styles = {
     boxShadow: '0 4px 24px rgba(0,0,0,0.4)'
   },
   title: { color: '#fff', fontSize: 22, fontWeight: 700, margin: '0 0 2px' },
-  subtitle: { color: '#888', fontSize: 13, margin: '0 0 28px' },
+  titleRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 28px' },
+  subtitle: { color: '#888', fontSize: 13, margin: 0 },
+  statsLink: { color: '#888', fontSize: 13, textDecoration: 'none', padding: '4px 10px', border: '1px solid #333', borderRadius: 6 },
   label: { display: 'block', color: '#aaa', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 },
   optional: { color: '#555', fontWeight: 400, textTransform: 'none', letterSpacing: 0 },
   labelRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 },
