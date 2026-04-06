@@ -327,6 +327,7 @@ function StatsTab({ password }) {
           {locations.some(l => l.unreplied > 0) && (
             <div style={{ ...s.section, ...s.alertBox }}>
               <h3 style={{ ...s.sectionTitle, color: '#f87171' }}>Unreplied reviews</h3>
+              <p style={s.unrepliedNote}>The bot replies hourly - reviews posted in the last hour may not have a reply yet.</p>
               {locations.filter(l => l.unreplied > 0).flatMap(l =>
                 l.unrepliedList.map((r, i) => (
                   <div key={`${l.label}-${i}`} style={s.unrepliedRow}>
@@ -622,6 +623,7 @@ const s = {
     borderRadius: 8,
     padding: '14px 16px',
   },
+  unrepliedNote: { color: '#f87171', fontSize: 12, opacity: 0.7, margin: '-4px 0 10px' },
   unrepliedRow: { color: '#ddd', fontSize: 13, marginBottom: 8, lineHeight: 1.5 },
   unrepliedComment: { color: '#999', fontSize: 12, marginTop: 2, fontStyle: 'italic' },
   sampleCard: {
