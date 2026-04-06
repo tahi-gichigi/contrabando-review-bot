@@ -623,7 +623,7 @@ const s = {
     borderRadius: 8,
     padding: '14px 16px',
   },
-  unrepliedNote: { color: '#f87171', fontSize: 12, opacity: 0.7, margin: '-4px 0 10px' },
+  unrepliedNote: { color: '#aaa', fontSize: 12, margin: '-4px 0 10px' },
   unrepliedRow: { color: '#ddd', fontSize: 13, marginBottom: 8, lineHeight: 1.5 },
   unrepliedComment: { color: '#999', fontSize: 12, marginTop: 2, fontStyle: 'italic' },
   sampleCard: {
